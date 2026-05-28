@@ -1,0 +1,1057 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+
+// ── Fonts ─────────────────────────────────────────────────────────────────────
+const _fl = document.createElement("link");
+_fl.rel = "stylesheet";
+_fl.href = "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap";
+document.head.appendChild(_fl);
+
+// ── Global CSS ────────────────────────────────────────────────────────────────
+const _gs = document.createElement("style");
+_gs.textContent = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--raised:#1a1a26;--border:rgba(255,255,255,0.07);
+  --accent:#6c63ff;--accent2:#ff6b9d;--green:#4ade80;--yellow:#facc15;--red:#f87171;
+  --text:#e8e8f0;--muted:#6b6b85;
+  --font:'Syne',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body,#root{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.4}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+input,textarea{font-family:var(--mono);background:transparent;border:none;outline:none;color:var(--text);width:100%;resize:none}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes popIn{0%{transform:scale(.4) translateY(10px);opacity:0}70%{transform:scale(1.15) translateY(-4px);opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-80px) scale(1.5);opacity:0}}
+@keyframes handBounce{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes shakeX{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes badgePop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+.fade-up{animation:fadeUp .45s cubic-bezier(.22,.68,0,1.2) both}
+.fade-up-1{animation-delay:.05s}.fade-up-2{animation-delay:.12s}.fade-up-3{animation-delay:.2s}.fade-up-4{animation-delay:.28s}
+
+.glass{background:var(--surface);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(12px)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:10px;
+  font-family:var(--font);font-weight:600;font-size:14px;letter-spacing:.02em;cursor:pointer;border:none;
+  transition:all .18s ease;position:relative;overflow:hidden;user-select:none;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background .15s}
+.btn:not(:disabled):hover::after{background:rgba(255,255,255,.05)}
+.btn:not(:disabled):active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 24px rgba(108,99,255,.35)}
+.btn-primary:not(:disabled):hover{box-shadow:0 0 36px rgba(108,99,255,.55)}
+.btn-ghost{background:var(--raised);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+.btn-danger:not(:disabled):hover{background:rgba(248,113,113,.25)}
+.btn-active{background:rgba(108,99,255,.2);color:var(--accent);border:1px solid rgba(108,99,255,.4)}
+.btn-yellow{background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.35)}
+
+.field{background:var(--raised);border:1px solid var(--border);border-radius:10px;padding:12px 16px;
+  display:flex;align-items:center;gap:10px;transition:border-color .18s}
+.field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.12)}
+.field.error{border-color:var(--red);box-shadow:0 0 0 3px rgba(248,113,113,.12)}
+.field.shake{animation:shakeX .35s ease}
+
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+  font-size:11px;font-weight:600;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.tag-green{background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.tag-red{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+.tag-muted{background:var(--raised);color:var(--muted);border:1px solid var(--border)}
+.tag-accent{background:rgba(108,99,255,.15);color:var(--accent);border:1px solid rgba(108,99,255,.25)}
+.tag-yellow{background:rgba(250,204,21,.12);color:var(--yellow);border:1px solid rgba(250,204,21,.25)}
+
+.wave-bar{display:inline-block;width:3px;border-radius:2px;background:var(--accent);animation:wave .9s ease-in-out infinite}
+
+.dot-live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);position:relative}
+.dot-live::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);animation:pulse-ring 1.4s ease-out infinite}
+
+.divider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+
+.tooltip-wrap{position:relative}
+.tooltip-wrap:hover .tooltip-box{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(-4px)}
+.tooltip-box{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(0);
+  background:var(--raised);border:1px solid var(--border);border-radius:6px;padding:5px 10px;
+  font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap;
+  opacity:0;pointer-events:none;transition:all .15s;z-index:200}
+
+.blob{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;opacity:.12}
+
+/* ── Chat Panel ─────────────────────────────────── */
+.chat-panel{
+  width:320px;min-width:280px;border-left:1px solid var(--border);
+  display:flex;flex-direction:column;background:var(--surface);
+  animation:slideIn .25s ease both;flex-shrink:0;
+}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{animation:msgIn .2s ease both;max-width:100%}
+.chat-msg.self .bubble{background:rgba(108,99,255,.18);border:1px solid rgba(108,99,255,.25);border-radius:12px 12px 4px 12px;margin-left:auto}
+.chat-msg.other .bubble{background:var(--raised);border:1px solid var(--border);border-radius:12px 12px 12px 4px}
+.bubble{padding:9px 13px;display:inline-block;max-width:100%;word-break:break-word;font-size:13px;line-height:1.5}
+.msg-meta{font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:3px}
+.chat-msg.self .msg-meta{text-align:right}
+
+/* ── Emoji picker ───────────────────────────────── */
+.emoji-picker{
+  position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);z-index:300;animation:popIn .2s ease both;
+  width:220px;
+}
+.emoji-btn{background:none;border:none;font-size:22px;cursor:pointer;border-radius:8px;
+  padding:6px;transition:background .12s;display:flex;align-items:center;justify-content:center}
+.emoji-btn:hover{background:var(--raised)}
+
+/* ── Floating reactions ─────────────────────────── */
+.float-reaction{
+  position:fixed;font-size:28px;pointer-events:none;z-index:500;
+  animation:floatUp 1.6s ease-out forwards;
+}
+
+/* ── Unread badge ───────────────────────────────── */
+.unread-badge{
+  position:absolute;top:-4px;right:-4px;
+  background:var(--accent2);color:#fff;
+  width:18px;height:18px;border-radius:50%;
+  font-size:10px;font-weight:700;font-family:var(--mono);
+  display:flex;align-items:center;justify-content:center;
+  animation:badgePop .25s ease both;
+  border:2px solid var(--bg);
+}
+
+/* ── Password modal ─────────────────────────────── */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  backdrop-filter:blur(6px);z-index:400;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:fadeUp .2s ease both;
+}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:32px;width:100%;max-width:380px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);
+}
+
+/* ── Peer tile hand raised ──────────────────────── */
+.hand-raised-badge{
+  position:absolute;top:-6px;right:-6px;font-size:16px;
+  animation:handBounce .5s ease-in-out infinite;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+}
+`;
+document.head.appendChild(_gs);
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const Icon = ({ d, size = 18, stroke = "currentColor", fill = "none", sw = 1.75 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+    <path d={d} />
+  </svg>
+);
+const I = {
+  mic:     "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8",
+  micOff:  "M1 1l22 22M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23M12 19v3M8 22h8",
+  phoneOff:"M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 3.6 4.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 12M23 1 1 23",
+  users:   "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  copy:    "M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 0 2 2v1",
+  check:   "M20 6 9 17l-5-5",
+  shuffle: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
+  x:       "M18 6 6 18M6 6l12 12",
+  warn:    "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
+  link:    "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
+  arrow:   "M5 12h14M12 5l7 7-7 7",
+  plus:    "M12 5v14M5 12h14",
+  hash:    "M4 9h16M4 15h16M10 3 8 21M16 3l-2 18",
+  lock:    "M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4",
+  eye:     "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+  eyeOff:  "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22",
+  chat:    "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  send:    "M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z",
+  smile:   "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
+  back:    "M15 18l-6-6 6-6",
+  key:     "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function genUID() {
+  const b = new Uint8Array(12);
+  crypto.getRandomValues(b);
+  return "u_" + Array.from(b).map(x => x.toString(16).padStart(2,"0")).join("");
+}
+function getUserId() {
+  try {
+    let id = sessionStorage.getItem("talkaro_uid");
+    if (!id) { id = genUID(); sessionStorage.setItem("talkaro_uid", id); }
+    return id;
+  } catch { return genUID(); }
+}
+const ROOM_RE = /^[A-Z0-9]{3,10}$/;
+function sanitize(raw) { return String(raw).trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,10); }
+function validateRoom(id) {
+  if (!id) return "Room ID is required";
+  if (!ROOM_RE.test(id)) return "3–10 letters/numbers only";
+  return null;
+}
+function avatarColor(id) {
+  const p=["#6c63ff","#ff6b9d","#4ade80","#facc15","#38bdf8","#fb923c","#a78bfa","#34d399"];
+  let h=0; for(const c of id) h=(h*31+c.charCodeAt(0))>>>0;
+  return p[h%p.length];
+}
+function initials(id) { return id.slice(-4,-2).toUpperCase(); }
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); } catch {
+    const el=document.createElement("textarea"); el.value=t;
+    el.style.cssText="position:fixed;opacity:0"; document.body.appendChild(el);
+    el.select(); document.execCommand("copy"); document.body.removeChild(el);
+  }
+}
+function fmt(ts) {
+  const d=new Date(ts);
+  return d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+}
+// Simple hash for password comparison (demo — use server-side bcrypt in production)
+async function hashPass(pass) {
+  const enc = new TextEncoder().encode(pass);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// ── Mock Socket ───────────────────────────────────────────────────────────────
+function makeMockSocket() {
+  const h={};
+  let _conn=false;
+  setTimeout(()=>{ _conn=true; emit("connect"); },600);
+  function emit(ev,...args){ (h[ev]||[]).forEach(fn=>fn(...args)); }
+  const sock={
+    get connected(){ return _conn; },
+    on(ev,fn){ (h[ev]=h[ev]||[]).push(fn); return this; },
+    once(ev,fn){ const w=(...a)=>{fn(...a);this.off(ev,w)}; return this.on(ev,w); },
+    off(ev,fn){ if(!fn) delete h[ev]; else h[ev]=(h[ev]||[]).filter(x=>x!==fn); return this; },
+    emit(ev,data){
+      if(ev==="random-talk-join"){
+        setTimeout(()=>{
+          const r=Math.random().toString(36).slice(2,7).toUpperCase();
+          emit("random-talk-matched",{roomId:r});
+        },2000);
+      }
+      // Echo chat messages back (demo only — server broadcasts in production)
+      if(ev==="chat-message"){ setTimeout(()=>emit("chat-message",data),30); }
+      if(ev==="reaction"){     setTimeout(()=>emit("reaction",data),30); }
+      if(ev==="hand-raise"){   setTimeout(()=>emit("hand-raise",data),30); }
+    },
+  };
+  return sock;
+  function emit(ev,...a){ (h[ev]||[]).forEach(fn=>fn(...a)); }
+}
+let _sock=null;
+function getSocket(){ if(!_sock) _sock=makeMockSocket(); return _sock; }
+
+// ── useSocket ─────────────────────────────────────────────────────────────────
+function useSocket(){
+  const ref=useRef(getSocket());
+  const [connected,setC]=useState(ref.current.connected);
+  useEffect(()=>{
+    const s=ref.current;
+    const on=()=>setC(true), off=()=>setC(false);
+    s.on("connect",on); s.on("disconnect",off);
+    if(s.connected) setC(true);
+    return ()=>{ s.off("connect",on); s.off("disconnect",off); };
+  },[]);
+  return {socket:ref.current,connected};
+}
+
+// ── useWebRTC (hardened) ──────────────────────────────────────────────────────
+const ICE={iceServers:[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  // Add TURN credentials here for production NAT traversal
+]};
+function useWebRTC({socket,roomId,userId,localStream}){
+  const pcs=useRef(new Map()), pend=useRef(new Map()), lRef=useRef(localStream);
+  const [peers,setPeers]=useState([]);
+  useEffect(()=>{ lRef.current=localStream; },[localStream]);
+
+  const refresh=useCallback(()=>setPeers([...pcs.current.keys()]),[]);
+
+  const drain=useCallback(async(rid,pc)=>{
+    const q=pend.current.get(rid)??[];
+    pend.current.delete(rid);
+    for(const c of q){ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch{} }
+  },[]);
+
+  const addTracks=useCallback((pc,s)=>{
+    if(!s) return;
+    const have=pc.getSenders().map(x=>x.track);
+    s.getTracks().forEach(t=>{ if(!have.includes(t)) pc.addTrack(t,s); });
+  },[]);
+
+  const attachAudio=useCallback((rid,s)=>{
+    let el=document.getElementById(`ta-${rid}`);
+    if(!el){ el=document.createElement("audio"); el.id=`ta-${rid}`; el.autoplay=true; el.style.display="none"; document.body.appendChild(el); }
+    el.srcObject=s??null;
+  },[]);
+
+  const createPC=useCallback((rid,s)=>{
+    if(pcs.current.has(rid)) return pcs.current.get(rid);
+    const pc=new RTCPeerConnection(ICE);
+    let neg=false;
+    pc.onnegotiationneeded=async()=>{
+      if(neg||pc.signalingState!=="stable") return; neg=true;
+      try{
+        await pc.setLocalDescription(await pc.createOffer());
+        socket.emit("webrtc-offer",{roomId,from:userId,to:rid,offer:pc.localDescription});
+      }catch(e){console.warn("[RTC]neg",e);}finally{neg=false;}
+    };
+    pc.onicecandidate=({candidate})=>{ if(candidate) socket.emit("webrtc-ice-candidate",{roomId,from:userId,to:rid,candidate}); };
+    pc.ontrack=({streams})=>attachAudio(rid,streams[0]);
+    pc.onconnectionstatechange=()=>{
+      if(["disconnected","failed","closed"].includes(pc.connectionState)){
+        pc.close(); pcs.current.delete(rid); pend.current.delete(rid);
+        document.getElementById(`ta-${rid}`)?.remove(); refresh();
+      }
+    };
+    addTracks(pc,s??lRef.current);
+    pcs.current.set(rid,pc); refresh(); return pc;
+  },[socket,roomId,userId,addTracks,attachAudio,refresh]);
+
+  useEffect(()=>{
+    const onOffer=async({from,to,offer})=>{
+      if(to!==userId) return;
+      try{
+        const pc=createPC(from);
+        if(pc.signalingState==="have-local-offer"){
+          if(userId>from){ try{await pc.setLocalDescription({type:"rollback"});}catch{pcs.current.delete(from);createPC(from);return;} }
+          else return;
+        }
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        addTracks(pc,lRef.current);
+        const ans=await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        socket.emit("webrtc-answer",{roomId,from:userId,to:from,answer:ans});
+        await drain(from,pc);
+      }catch(e){console.warn("[RTC]offer",e);}
+    };
+    const onAnswer=async({from,to,answer})=>{
+      if(to!==userId) return;
+      try{
+        const pc=pcs.current.get(from);
+        if(!pc||pc.signalingState!=="have-local-offer") return;
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        await drain(from,pc);
+      }catch(e){console.warn("[RTC]answer",e);}
+    };
+    const onIce=async({from,to,candidate})=>{
+      if(to!==userId) return;
+      try{
+        const pc=pcs.current.get(from);
+        if(pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        else{ const q=pend.current.get(from)??[]; q.push(candidate); pend.current.set(from,q); }
+      }catch{}
+    };
+    const onJoin=({userId:r})=>{ if(r!==userId) createPC(r,lRef.current); };
+    const onLeft=({userId:r})=>{
+      pcs.current.get(r)?.close(); pcs.current.delete(r); pend.current.delete(r);
+      document.getElementById(`ta-${r}`)?.remove(); refresh();
+    };
+    socket.on("webrtc-offer",onOffer); socket.on("webrtc-answer",onAnswer);
+    socket.on("webrtc-ice-candidate",onIce); socket.on("user-joined",onJoin); socket.on("user-left",onLeft);
+    return ()=>{
+      socket.off("webrtc-offer",onOffer); socket.off("webrtc-answer",onAnswer);
+      socket.off("webrtc-ice-candidate",onIce); socket.off("user-joined",onJoin); socket.off("user-left",onLeft);
+    };
+  },[socket,roomId,userId,createPC,addTracks,drain,refresh]);
+
+  const cleanup=useCallback(()=>{
+    pcs.current.forEach(p=>p.close()); pcs.current.clear(); pend.current.clear();
+    document.querySelectorAll("audio[id^='ta-']").forEach(e=>e.remove()); setPeers([]);
+  },[]);
+
+  return {peers,cleanup};
+}
+
+// ── Shared UI ─────────────────────────────────────────────────────────────────
+function WaveBars({active,color="var(--accent)",bars=5}){
+  return(
+    <span style={{display:"inline-flex",alignItems:"center",gap:3,height:20}}>
+      {Array.from({length:bars},(_,i)=>(
+        <span key={i} className="wave-bar" style={{height:16,background:color,animationDelay:`${i*.12}s`,animationPlayState:active?"running":"paused",opacity:active?1:.3}} />
+      ))}
+    </span>
+  );
+}
+
+function Toast({message,type="info",onClose}){
+  useEffect(()=>{ const t=setTimeout(onClose,3200); return()=>clearTimeout(t); },[onClose]);
+  const c={success:"var(--green)",error:"var(--red)",info:"var(--accent)"};
+  return(
+    <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"var(--raised)",border:`1px solid ${c[type]}44`,borderRadius:10,padding:"12px 20px",display:"flex",alignItems:"center",gap:10,boxShadow:`0 8px 32px rgba(0,0,0,.5),0 0 0 1px ${c[type]}22`,zIndex:600,animation:"fadeUp .25s ease both",fontFamily:"var(--mono)",fontSize:13,color:"var(--text)",maxWidth:"calc(100vw - 48px)"}}>
+      <span style={{width:8,height:8,borderRadius:"50%",background:c[type],flexShrink:0}} />
+      {message}
+    </div>
+  );
+}
+
+// ── Password Modal ─────────────────────────────────────────────────────────────
+function PasswordModal({mode,onConfirm,onCancel,error,shake}){
+  const [pass,setPass]=useState("");
+  const [show,setShow]=useState(false);
+  const isSet=mode==="set";
+  return(
+    <div className="modal-backdrop">
+      <div className="modal fade-up">
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+          <div style={{width:44,height:44,borderRadius:12,background:"rgba(250,204,21,.12)",border:"1px solid rgba(250,204,21,.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <Icon d={I.lock} size={20} stroke="var(--yellow)" />
+          </div>
+          <div>
+            <div style={{fontWeight:700,fontSize:16}}>{isSet?"Set Room Password":"Password Required"}</div>
+            <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)",marginTop:2}}>
+              {isSet?"Members must enter this to join":"Enter the password to join this room"}
+            </div>
+          </div>
+        </div>
+
+        <div className={`field ${error?"error":""} ${shake?"shake":""}`} style={{marginBottom:error?8:16}}>
+          <Icon d={I.key} size={16} stroke="var(--muted)" />
+          <input
+            type={show?"text":"password"}
+            value={pass}
+            onChange={e=>setPass(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&onConfirm(pass)}
+            placeholder={isSet?"Choose a password…":"Enter password…"}
+            autoFocus
+          />
+          <button onClick={()=>setShow(s=>!s)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:"0 2px",flexShrink:0}}>
+            <Icon d={show?I.eyeOff:I.eye} size={16} stroke="var(--muted)" />
+          </button>
+        </div>
+        {error && <p style={{fontSize:12,color:"var(--red)",marginBottom:12,display:"flex",alignItems:"center",gap:5}}><Icon d={I.warn} size={13} stroke="var(--red)"/>{error}</p>}
+
+        <div style={{display:"flex",gap:10}}>
+          {onCancel&&<button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>}
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>onConfirm(pass)} disabled={!pass.trim()}>
+            <Icon d={I.check} size={16} />
+            {isSet?"Set Password":"Enter Room"}
+          </button>
+        </div>
+
+        {isSet&&(
+          <p style={{marginTop:12,fontSize:11,fontFamily:"var(--mono)",color:"var(--muted)",textAlign:"center"}}>
+            Leave blank to create an open room
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Peer Tile ──────────────────────────────────────────────────────────────────
+function PeerTile({peerId,isSelf,handRaised}){
+  const color=avatarColor(peerId);
+  return(
+    <div style={{background:"var(--raised)",border:`1px solid ${handRaised?"rgba(250,204,21,.35)":"var(--border)"}`,borderRadius:14,padding:"18px 12px",display:"flex",flexDirection:"column",alignItems:"center",gap:10,position:"relative",overflow:"hidden",transition:"border-color .2s",boxShadow:handRaised?"0 0 20px rgba(250,204,21,.12)":"none"}}>
+      <div style={{position:"absolute",top:8,left:"50%",transform:"translateX(-50%)",width:56,height:56,borderRadius:"50%",background:color,filter:"blur(28px)",opacity:.18}} />
+      <div style={{position:"relative"}}>
+        <div className="avatar" style={{background:`${color}22`,color,border:`2px solid ${color}44`,width:48,height:48,fontSize:16}}>
+          {initials(peerId)}
+          {!isSelf&&<span style={{position:"absolute",bottom:0,right:0,width:12,height:12,borderRadius:"50%",background:"var(--green)",border:"2px solid var(--raised)"}} />}
+        </div>
+        {handRaised&&<span className="hand-raised-badge">✋</span>}
+      </div>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)",letterSpacing:".04em"}}>{isSelf?"YOU":peerId.slice(-8).toUpperCase()}</div>
+        {!isSelf&&<WaveBars active bars={4} color={color} />}
+        {isSelf&&<div style={{fontSize:10,fontFamily:"var(--mono)",color:"var(--muted)",marginTop:3}}>you</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Chat Panel ─────────────────────────────────────────────────────────────────
+function ChatPanel({messages,onSend,onClose,userId}){
+  const [draft,setDraft]=useState("");
+  const bottomRef=useRef(null);
+
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages]);
+
+  function send(){
+    const t=draft.trim(); if(!t) return;
+    onSend(t); setDraft("");
+  }
+
+  return(
+    <div className="chat-panel">
+      {/* Header */}
+      <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10}}>
+        <Icon d={I.chat} size={16} stroke="var(--accent)" />
+        <span style={{fontWeight:700,fontSize:13,flex:1}}>Room Chat</span>
+        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"var(--muted)",display:"flex",padding:4}}>
+          <Icon d={I.x} size={16} />
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="chat-messages">
+        {messages.length===0&&(
+          <div style={{textAlign:"center",color:"var(--muted)",fontSize:12,fontFamily:"var(--mono)",marginTop:20}}>
+            No messages yet.<br/>Say hello 👋
+          </div>
+        )}
+        {messages.map(msg=>{
+          const self=msg.from===userId;
+          if(msg.type==="reaction"){
+            return(
+              <div key={msg.id} style={{textAlign:"center",margin:"4px 0"}}>
+                <span style={{fontSize:22}}>{msg.emoji}</span>
+                <span style={{fontSize:10,fontFamily:"var(--mono)",color:"var(--muted)",marginLeft:6}}>{self?"you":msg.from.slice(-4).toUpperCase()} reacted</span>
+              </div>
+            );
+          }
+          if(msg.type==="system"){
+            return(
+              <div key={msg.id} style={{textAlign:"center",fontSize:11,fontFamily:"var(--mono)",color:"var(--muted)",margin:"4px 0"}}>
+                {msg.text}
+              </div>
+            );
+          }
+          return(
+            <div key={msg.id} className={`chat-msg ${self?"self":"other"}`}>
+              {!self&&<div className="msg-meta">{msg.from.slice(-8).toUpperCase()} · {fmt(msg.ts)}</div>}
+              {self&&<div className="msg-meta">{fmt(msg.ts)}</div>}
+              <div className="bubble">{msg.text}</div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{padding:"12px 14px",borderTop:"1px solid var(--border)"}}>
+        <div className="field" style={{padding:"10px 14px"}}>
+          <textarea
+            value={draft}
+            onChange={e=>setDraft(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } }}
+            placeholder="Type a message…"
+            rows={1}
+            style={{lineHeight:1.5,fontSize:13,maxHeight:80}}
+          />
+          <button onClick={send} disabled={!draft.trim()} style={{background:"none",border:"none",cursor:draft.trim()?"pointer":"default",color:draft.trim()?"var(--accent)":"var(--muted)",flexShrink:0,display:"flex",transition:"color .15s"}}>
+            <Icon d={I.send} size={17} />
+          </button>
+        </div>
+        <div style={{fontSize:10,fontFamily:"var(--mono)",color:"var(--muted)",marginTop:6,textAlign:"right"}}>Enter to send · Shift+Enter for newline</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Floating Reaction ──────────────────────────────────────────────────────────
+let _rxId=0;
+function FloatingReactions({reactions}){
+  return(
+    <>
+      {reactions.map(r=>(
+        <div key={r.id} className="float-reaction" style={{left:`${r.x}%`,bottom:80}}>{r.emoji}</div>
+      ))}
+    </>
+  );
+}
+
+// ── Home Page ──────────────────────────────────────────────────────────────────
+function HomePage({navigate}){
+  const {socket,connected}=useSocket();
+  const userId=useMemo(()=>getUserId(),[]);
+
+  const [createId,setCreateId]=useState("");
+  const [joinId,setJoinId]=useState("");
+  const [createErr,setCreateErr]=useState("");
+  const [joinErr,setJoinErr]=useState("");
+  const [matching,setMatching]=useState(false);
+  const [matchTimer,setMatchTimer]=useState(0);
+  const [toast,setToast]=useState(null);
+  const [copied,setCopied]=useState(false);
+
+  // Password flow for create
+  const [showPassModal,setShowPassModal]=useState(false);
+  const [pendingRoomId,setPendingRoomId]=useState("");
+
+  const timerRef=useRef(null);
+  const TIMEOUT=60;
+
+  useEffect(()=>{
+    if(!matching){ clearInterval(timerRef.current); setMatchTimer(0); return; }
+    timerRef.current=setInterval(()=>{
+      setMatchTimer(p=>{
+        if(p+1>=TIMEOUT){ clearInterval(timerRef.current); setMatching(false); socket.emit("random-talk-cancel",{userId}); setToast({message:"No match found. Try again.",type:"error"}); return 0; }
+        return p+1;
+      });
+    },1000);
+    return()=>clearInterval(timerRef.current);
+  },[matching,socket,userId]);
+
+  function doCreate(){
+    const id=sanitize(createId);
+    const err=validateRoom(id); if(err){setCreateErr(err);return;}
+    setCreateErr(""); setPendingRoomId(id); setShowPassModal(true);
+  }
+
+  async function confirmCreate(pass){
+    const hash=pass.trim() ? await hashPass(pass.trim()) : "";
+    // Store hash in sessionStorage keyed by roomId so the room page can verify joiners
+    // In production this would be sent to the server
+    if(hash) sessionStorage.setItem(`talkaro_room_pw_${pendingRoomId}`,hash);
+    setShowPassModal(false);
+    navigate(`room/${pendingRoomId}`);
+  }
+
+  function doJoin(){
+    const id=sanitize(joinId);
+    const err=validateRoom(id); if(err){setJoinErr(err);return;}
+    setJoinErr(""); navigate(`room/${id}`);
+  }
+
+  function doRandom(){
+    if(!connected){setToast({message:"Not connected",type:"error"});return;}
+    socket.emit("random-talk-join",{userId}); setMatching(true);
+    socket.once("random-talk-matched",({roomId})=>{ setMatching(false); clearInterval(timerRef.current); navigate(`room/${roomId}`); });
+  }
+
+  function cancelRandom(){ socket.emit("random-talk-cancel",{userId}); socket.off("random-talk-matched"); setMatching(false); }
+
+  async function shareLink(id){ await copyText(`${location.origin}/#/room/${id}`); setCopied(true); setTimeout(()=>setCopied(false),2000); }
+
+  const previewId=sanitize(createId)||null;
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px",position:"relative"}}>
+      <div className="blob" style={{width:400,height:400,top:"-10%",left:"-10%",background:"var(--accent)"}} />
+      <div className="blob" style={{width:300,height:300,bottom:"5%",right:"-8%",background:"var(--accent2)"}} />
+
+      <div style={{width:"100%",maxWidth:460,position:"relative",zIndex:1}}>
+        {/* Header */}
+        <div className="fade-up" style={{textAlign:"center",marginBottom:44}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:64,height:64,borderRadius:18,background:"rgba(108,99,255,.15)",border:"1px solid rgba(108,99,255,.25)",marginBottom:20,animation:"float 3s ease-in-out infinite"}}>
+            <Icon d={I.mic} size={28} stroke="var(--accent)" />
+          </div>
+          <h1 style={{fontSize:44,fontWeight:800,letterSpacing:"-.03em",lineHeight:1}}>Talkaro</h1>
+          <p style={{marginTop:10,color:"var(--muted)",fontSize:13,fontFamily:"var(--mono)"}}>anonymous voice rooms · no signup</p>
+          <div style={{marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            {connected
+              ? <><span className="dot-live" style={{width:7,height:7}} /><span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--green)"}}>server connected</span></>
+              : <><span style={{display:"inline-block",width:7,height:7,borderRadius:"50%",background:"var(--red)"}} /><span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--red)"}}>connecting…</span></>
+            }
+          </div>
+        </div>
+
+        {/* Create */}
+        <div className="glass fade-up fade-up-1" style={{padding:24,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <Icon d={I.plus} size={15} stroke="var(--accent)" />
+            <span style={{fontWeight:700,fontSize:12,letterSpacing:".05em",textTransform:"uppercase",color:"var(--accent)"}}>Create Room</span>
+          </div>
+          <div className={`field ${createErr?"error":""}`} style={{marginBottom:8}}>
+            <Icon d={I.hash} size={15} stroke="var(--muted)" />
+            <input value={createId} onChange={e=>{setCreateId(e.target.value);setCreateErr("");}} onKeyDown={e=>e.key==="Enter"&&doCreate()} placeholder="MYROOM" maxLength={10} spellCheck={false} style={{textTransform:"uppercase",fontWeight:600,letterSpacing:".1em"}} />
+            {previewId&&(
+              <button onClick={()=>shareLink(previewId)} className="btn btn-ghost" style={{padding:"5px 10px",fontSize:11,gap:4,flexShrink:0}}>
+                <Icon d={copied?I.check:I.copy} size={13} stroke={copied?"var(--green)":"currentColor"} />
+                {copied?"Copied":"Share"}
+              </button>
+            )}
+          </div>
+          {createErr&&<p style={{fontSize:12,color:"var(--red)",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><Icon d={I.warn} size={13} stroke="var(--red)"/>{createErr}</p>}
+          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)",display:"flex",alignItems:"center",gap:5}}>
+              <Icon d={I.lock} size={13} stroke="var(--yellow)" />
+              Optional password — set on next screen
+            </div>
+          </div>
+          <button className="btn btn-primary" style={{width:"100%"}} onClick={doCreate} disabled={!connected}>
+            <Icon d={I.arrow} size={16} />
+            Create & Configure
+          </button>
+        </div>
+
+        {/* Join */}
+        <div className="glass fade-up fade-up-2" style={{padding:24,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <Icon d={I.link} size={15} stroke="var(--accent2)" />
+            <span style={{fontWeight:700,fontSize:12,letterSpacing:".05em",textTransform:"uppercase",color:"var(--accent2)"}}>Join Room</span>
+          </div>
+          <div className={`field ${joinErr?"error":""}`} style={{marginBottom:8}}>
+            <Icon d={I.hash} size={15} stroke="var(--muted)" />
+            <input value={joinId} onChange={e=>{setJoinId(e.target.value);setJoinErr("");}} onKeyDown={e=>e.key==="Enter"&&doJoin()} placeholder="Enter room ID" maxLength={10} spellCheck={false} style={{textTransform:"uppercase",fontWeight:600,letterSpacing:".1em"}} />
+          </div>
+          {joinErr&&<p style={{fontSize:12,color:"var(--red)",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><Icon d={I.warn} size={13} stroke="var(--red)"/>{joinErr}</p>}
+          <button className="btn btn-ghost" style={{width:"100%",borderColor:"rgba(255,107,157,.25)"}} onClick={doJoin} disabled={!connected}>
+            <Icon d={I.users} size={16} stroke="var(--accent2)" />
+            Join Room
+          </button>
+        </div>
+
+        <div className="divider fade-up fade-up-3" style={{margin:"18px 0"}}>or</div>
+
+        {/* Random */}
+        <div className="fade-up fade-up-4">
+          {!matching
+            ? <button className="btn btn-ghost" style={{width:"100%",padding:16,fontSize:15,borderStyle:"dashed"}} onClick={doRandom} disabled={!connected}>
+                <Icon d={I.shuffle} size={18} />
+                Random Talk
+                <span style={{marginLeft:"auto",fontSize:11,fontFamily:"var(--mono)",color:"var(--muted)"}}>match with stranger</span>
+              </button>
+            : <div style={{background:"var(--raised)",border:"1px solid rgba(108,99,255,.3)",borderRadius:12,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+                <WaveBars active bars={6} />
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:600}}>Finding a match…</div>
+                  <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)",marginTop:2}}>{TIMEOUT-matchTimer}s remaining</div>
+                </div>
+                <button className="btn btn-danger" style={{padding:"8px 14px",fontSize:12}} onClick={cancelRandom}>
+                  <Icon d={I.x} size={14} />Cancel
+                </button>
+              </div>
+          }
+        </div>
+
+        <div style={{textAlign:"center",marginTop:32,color:"var(--muted)",fontSize:11,fontFamily:"var(--mono)"}}>
+          peer-to-peer · end-to-end encrypted · no recording
+        </div>
+      </div>
+
+      {showPassModal&&(
+        <PasswordModal
+          mode="set"
+          onConfirm={confirmCreate}
+          onCancel={()=>setShowPassModal(false)}
+        />
+      )}
+
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
+    </div>
+  );
+}
+
+// ── Room Page ──────────────────────────────────────────────────────────────────
+function RoomPage({roomId,navigate}){
+  const userId=useMemo(()=>getUserId(),[]);
+  const {socket,connected}=useSocket();
+
+  const [localStream,setLocalStream]=useState(null);
+  const [micEnabled,setMicEnabled]=useState(true);
+  const [audioError,setAudioError]=useState(null);
+  const [roomUsers,setRoomUsers]=useState([userId]);
+  const [toast,setToast]=useState(null);
+  const [copied,setCopied]=useState(false);
+  const [joining,setJoining]=useState(true);
+
+  // Password gate
+  const [passGate,setPassGate]=useState(()=>!!sessionStorage.getItem(`talkaro_room_pw_${roomId}`) && sessionStorage.getItem(`talkaro_room_verified_${roomId}`)!=="1");
+  const [passError,setPassError]=useState("");
+  const [passShake,setPassShake]=useState(false);
+
+  // Chat
+  const [messages,setMessages]=useState([]);
+  const [chatOpen,setChatOpen]=useState(false);
+  const [unread,setUnread]=useState(0);
+
+  // Reactions (floating)
+  const [floatRx,setFloatRx]=useState([]);
+
+  // Emoji picker
+  const [showPicker,setShowPicker]=useState(false);
+  const pickerRef=useRef(null);
+
+  // Hand raise — map of userId → boolean
+  const [hands,setHands]=useState({});
+  const myHand=hands[userId]??false;
+
+  const {peers,cleanup}=useWebRTC({socket,roomId,userId,localStream});
+
+  const allParticipants=useMemo(()=>[...new Set([userId,...peers,...roomUsers])],[userId,peers,roomUsers]);
+  const isProtected=!!sessionStorage.getItem(`talkaro_room_pw_${roomId}`);
+
+  // Close picker on outside click
+  useEffect(()=>{
+    if(!showPicker) return;
+    const fn=e=>{ if(pickerRef.current&&!pickerRef.current.contains(e.target)) setShowPicker(false); };
+    document.addEventListener("mousedown",fn);
+    return()=>document.removeEventListener("mousedown",fn);
+  },[showPicker]);
+
+  // Mic
+  useEffect(()=>{
+    if(passGate) return;
+    navigator.mediaDevices?.getUserMedia({audio:true,video:false})
+      .then(s=>{setLocalStream(s);setAudioError(null);})
+      .catch(e=>setAudioError(e.name==="NotAllowedError"?"Microphone access denied. Allow it in browser settings.":"Could not access microphone."));
+    return()=>localStream?.getTracks().forEach(t=>t.stop());
+  },[passGate]);
+
+  // Socket events
+  useEffect(()=>{
+    if(!connected||passGate) return;
+    socket.emit("join-room",{roomId,userId});
+    setJoining(false);
+
+    socket.on("room-users",({users})=>setRoomUsers(users??[userId]));
+    socket.on("user-joined",({userId:uid})=>{ setRoomUsers(p=>p.includes(uid)?p:[...p,uid]); addSystemMsg(`${uid.slice(-8).toUpperCase()} joined`); });
+    socket.on("user-left",  ({userId:uid})=>{ setRoomUsers(p=>p.filter(x=>x!==uid)); addSystemMsg(`${uid.slice(-8).toUpperCase()} left`); setHands(h=>{const n={...h};delete n[uid];return n;}); });
+
+    socket.on("chat-message",msg=>{
+      setMessages(p=>[...p,msg]);
+      if(!chatOpen) setUnread(u=>u+1);
+    });
+    socket.on("reaction",({from,emoji})=>{
+      // Add to chat log
+      setMessages(p=>[...p,{id:Date.now()+Math.random(),type:"reaction",from,emoji,ts:Date.now()}]);
+      // Float it
+      spawnFloat(emoji);
+    });
+    socket.on("hand-raise",({userId:uid,raised})=>{
+      setHands(h=>({...h,[uid]:raised}));
+      if(raised&&uid!==userId) setToast({message:`${uid.slice(-8).toUpperCase()} raised their hand ✋`,type:"info"});
+    });
+
+    return()=>{
+      socket.emit("leave-room",{roomId,userId});
+      socket.off("room-users"); socket.off("user-joined"); socket.off("user-left");
+      socket.off("chat-message"); socket.off("reaction"); socket.off("hand-raise");
+    };
+  },[connected,passGate,socket,roomId,userId]);
+
+  useEffect(()=>()=>cleanup(),[cleanup]);
+
+  function addSystemMsg(text){
+    setMessages(p=>[...p,{id:Date.now()+Math.random(),type:"system",text,ts:Date.now()}]);
+  }
+
+  function spawnFloat(emoji){
+    const id=++_rxId;
+    const x=20+Math.random()*60;
+    setFloatRx(p=>[...p,{id,emoji,x}]);
+    setTimeout(()=>setFloatRx(p=>p.filter(r=>r.id!==id)),1700);
+  }
+
+  // Password verification
+  async function verifyPass(pass){
+    const stored=sessionStorage.getItem(`talkaro_room_pw_${roomId}`);
+    const h=await hashPass(pass.trim());
+    if(h===stored){
+      sessionStorage.setItem(`talkaro_room_verified_${roomId}`,"1");
+      setPassGate(false); setPassError("");
+    } else {
+      setPassError("Incorrect password"); setPassShake(true);
+      setTimeout(()=>setPassShake(false),400);
+    }
+  }
+
+  function toggleMic(){
+    if(!localStream) return;
+    const e=!micEnabled;
+    localStream.getAudioTracks().forEach(t=>{t.enabled=e;});
+    setMicEnabled(e);
+    setToast({message:e?"Microphone unmuted":"Microphone muted",type:"info"});
+  }
+
+  function toggleHand(){
+    const raised=!myHand;
+    setHands(h=>({...h,[userId]:raised}));
+    socket.emit("hand-raise",{roomId,userId,raised});
+    if(raised) setToast({message:"Hand raised ✋ — others can see you",type:"info"});
+  }
+
+  function sendMessage(text){
+    const msg={id:Date.now()+Math.random(),type:"chat",from:userId,text,ts:Date.now()};
+    socket.emit("chat-message",{roomId,...msg});
+  }
+
+  function sendReaction(emoji){
+    setShowPicker(false);
+    socket.emit("reaction",{roomId,from:userId,emoji});
+  }
+
+  function openChat(){ setChatOpen(true); setUnread(0); }
+
+  async function copyLink(){ await copyText(`${location.origin}/#/room/${roomId}`); setCopied(true); setToast({message:"Link copied!",type:"success"}); setTimeout(()=>setCopied(false),2000); }
+
+  function leave(){ localStream?.getTracks().forEach(t=>t.stop()); cleanup(); navigate(""); }
+
+  // Password gate screen
+  if(passGate){
+    return(
+      <PasswordModal
+        mode="join"
+        onConfirm={verifyPass}
+        onCancel={()=>navigate("")}
+        error={passError}
+        shake={passShake}
+      />
+    );
+  }
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",position:"relative"}}>
+      <div className="blob" style={{width:500,height:500,top:"-20%",right:"-15%",background:"var(--accent)"}} />
+
+      {/* Header */}
+      <header style={{padding:"14px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,background:"rgba(10,10,15,.85)",backdropFilter:"blur(14px)",position:"sticky",top:0,zIndex:10}}>
+        <button className="btn btn-ghost" style={{padding:"8px 12px",fontSize:12}} onClick={()=>navigate("")}>
+          <Icon d={I.back} size={16} />
+        </button>
+        <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+          <div style={{background:"rgba(108,99,255,.15)",border:"1px solid rgba(108,99,255,.25)",borderRadius:8,padding:"6px 12px",fontFamily:"var(--mono)",fontWeight:700,fontSize:14,letterSpacing:".1em",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+            <Icon d={I.hash} size={12} stroke="var(--accent)" />{roomId}
+            {isProtected&&<Icon d={I.lock} size={12} stroke="var(--yellow)" />}
+          </div>
+          <span className="tag tag-green"><span className="dot-live" style={{width:6,height:6}} />LIVE</span>
+          {Object.values(hands).some(Boolean)&&<span className="tag tag-yellow">✋ {Object.values(hands).filter(Boolean).length}</span>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)",whiteSpace:"nowrap"}}>{allParticipants.length} in room</span>
+          <button className="btn btn-ghost tooltip-wrap" style={{padding:"8px 12px"}} onClick={copyLink}>
+            <Icon d={copied?I.check:I.copy} size={15} stroke={copied?"var(--green)":"currentColor"} />
+            <span className="tooltip-box">Copy invite link</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+        <main style={{flex:1,padding:"22px 20px",overflowY:"auto",position:"relative",zIndex:1,minWidth:0}}>
+
+          {audioError&&(
+            <div style={{background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.25)",borderRadius:12,padding:"14px 18px",marginBottom:20,display:"flex",gap:12,alignItems:"flex-start"}}>
+              <Icon d={I.warn} size={18} stroke="var(--red)" />
+              <div><div style={{fontWeight:600,fontSize:14,color:"var(--red)"}}>Microphone Error</div><div style={{fontSize:13,color:"var(--muted)",marginTop:3}}>{audioError}</div></div>
+            </div>
+          )}
+
+          {/* Participants */}
+          <div style={{marginBottom:24}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+              <Icon d={I.users} size={15} stroke="var(--muted)" />
+              <span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:".06em"}}>Participants</span>
+            </div>
+            {joining
+              ? <div style={{display:"flex",alignItems:"center",gap:10,color:"var(--muted)",fontSize:13,fontFamily:"var(--mono)"}}><span style={{width:16,height:16,border:"2px solid var(--accent)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin .7s linear infinite"}} />Joining room…</div>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:12}}>
+                  {allParticipants.map(id=><PeerTile key={id} peerId={id} isSelf={id===userId} handRaised={hands[id]??false} />)}
+                </div>
+            }
+          </div>
+
+          {/* Info bar */}
+          <div style={{background:"var(--raised)",border:"1px solid var(--border)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+            <Icon d={I.lock} size={15} stroke={isProtected?"var(--yellow)":"var(--accent)"} />
+            <div>
+              <div style={{fontSize:13,fontWeight:600}}>{isProtected?"Password protected · ":""}End-to-end encrypted</div>
+              <div style={{fontSize:12,color:"var(--muted)",fontFamily:"var(--mono)",marginTop:2}}>Audio travels peer-to-peer via WebRTC · nothing recorded</div>
+            </div>
+          </div>
+        </main>
+
+        {/* Chat sidebar */}
+        {chatOpen&&(
+          <ChatPanel
+            messages={messages}
+            onSend={sendMessage}
+            onReact={sendReaction}
+            onClose={()=>setChatOpen(false)}
+            userId={userId}
+          />
+        )}
+      </div>
+
+      {/* Controls */}
+      <div style={{padding:"14px 20px",borderTop:"1px solid var(--border)",background:"rgba(10,10,15,.92)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,position:"sticky",bottom:0,flexWrap:"wrap"}}>
+
+        {/* Mic */}
+        <div className="tooltip-wrap">
+          <button className="btn" style={{width:52,height:52,borderRadius:"50%",padding:0,background:micEnabled?"rgba(108,99,255,.15)":"rgba(248,113,113,.15)",border:`1px solid ${micEnabled?"rgba(108,99,255,.35)":"rgba(248,113,113,.35)"}`,boxShadow:micEnabled?"0 0 20px rgba(108,99,255,.2)":"0 0 20px rgba(248,113,113,.2)"}} onClick={toggleMic} disabled={!localStream}>
+            <Icon d={micEnabled?I.mic:I.micOff} size={20} stroke={micEnabled?"var(--accent)":"var(--red)"} />
+          </button>
+          <span className="tooltip-box">{micEnabled?"Mute":"Unmute"}</span>
+        </div>
+
+        {/* Waveform */}
+        <div style={{padding:"10px 16px",background:"var(--raised)",border:"1px solid var(--border)",borderRadius:999,display:"flex",alignItems:"center",gap:10}}>
+          <WaveBars active={micEnabled&&!!localStream} bars={6} />
+          <span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--muted)"}}>{micEnabled?"live":"muted"}</span>
+        </div>
+
+        {/* Hand raise */}
+        <div className="tooltip-wrap">
+          <button className={`btn ${myHand?"btn-yellow":"btn-ghost"}`} style={{width:52,height:52,borderRadius:"50%",padding:0}} onClick={toggleHand}>
+            <span style={{fontSize:20,display:"inline-block",animation:myHand?"handBounce .5s ease-in-out infinite":"none"}}>✋</span>
+          </button>
+          <span className="tooltip-box">{myHand?"Lower hand":"Raise hand"}</span>
+        </div>
+
+        {/* Emoji reaction */}
+        <div className="tooltip-wrap" ref={pickerRef} style={{position:"relative"}}>
+          <button className="btn btn-ghost" style={{width:52,height:52,borderRadius:"50%",padding:0}} onClick={()=>setShowPicker(s=>!s)}>
+            <Icon d={I.smile} size={20} />
+          </button>
+          <span className="tooltip-box">React</span>
+          {showPicker&&(
+            <div className="emoji-picker" style={{bottom:"calc(100% + 10px)",left:"50%",transform:"translateX(-50%)"}}>
+              {["👍","❤️","😂","😮","🔥","🎉","👏","💯","🤔","😢","👎","✨","🙌","😍","🤣","💪","🥳","🫡","⭐","🫶"].map(e=>(
+                <button key={e} className="emoji-btn" onClick={()=>sendReaction(e)}>{e}</button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Chat */}
+        <div className="tooltip-wrap" style={{position:"relative"}}>
+          <button className={`btn ${chatOpen?"btn-active":"btn-ghost"}`} style={{width:52,height:52,borderRadius:"50%",padding:0}} onClick={chatOpen?()=>setChatOpen(false):openChat}>
+            <Icon d={I.chat} size={20} stroke={chatOpen?"var(--accent)":"currentColor"} />
+          </button>
+          <span className="tooltip-box">Chat</span>
+          {unread>0&&!chatOpen&&<span className="unread-badge">{unread>9?"9+":unread}</span>}
+        </div>
+
+        {/* Leave */}
+        <div className="tooltip-wrap">
+          <button className="btn" style={{width:52,height:52,borderRadius:"50%",padding:0,background:"rgba(248,113,113,.15)",border:"1px solid rgba(248,113,113,.35)"}} onClick={leave}>
+            <Icon d={I.phoneOff} size={20} stroke="var(--red)" />
+          </button>
+          <span className="tooltip-box">Leave</span>
+        </div>
+      </div>
+
+      <FloatingReactions reactions={floatRx} />
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
+    </div>
+  );
+}
+
+// ── Router ─────────────────────────────────────────────────────────────────────
+export default function Talkaro(){
+  const [route,setRoute]=useState(()=>location.hash.replace("#/","")||"");
+  useEffect(()=>{
+    const fn=()=>setRoute(location.hash.replace("#/","")||"");
+    window.addEventListener("hashchange",fn);
+    return()=>window.removeEventListener("hashchange",fn);
+  },[]);
+  function navigate(p){ location.hash=p?`/${p}`:"/"; setRoute(p||""); }
+  const m=route.match(/^room\/([A-Z0-9]{3,10})$/i);
+  if(m){
+    const id=sanitize(m[1]);
+    if(!validateRoom(id)) return <RoomPage key={id} roomId={id} navigate={navigate} />;
+  }
+  return <HomePage navigate={navigate} />;
+}
